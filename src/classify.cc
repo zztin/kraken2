@@ -100,7 +100,7 @@ taxid_t ResolveTree(taxon_counts_t &hit_counts,
     Taxonomy &tax, size_t total_minimizers, Options &opts);
 void ReportStats(struct timeval time1, struct timeval time2,
     ClassificationStats &stats);
-void InitializeOutputs(Options &opts, OutputStreamData &outputs, SequenceFormat format);
+void InitializeOutputs(Options &opts, OutputStreamData &outputs, SequenceFormat format, const char* filename);
 void MaskLowQualityBases(Sequence &dna, int minimum_quality_score);
 
 int main(int argc, char **argv) {
@@ -153,6 +153,8 @@ int main(int argc, char **argv) {
   }
   else {
     for (int i = optind; i < argc; i++) {
+      call_counts.clear();
+      outputs.initialized = false;
       if (opts.paired_end_processing && ! opts.single_file_pairs) {
         if (i + 1 == argc) {
           errx(EX_USAGE, "paired end processing used with unpaired file");
@@ -358,7 +360,7 @@ void ProcessFiles(const char *filename1, const char *filename2,
       }
 
       if (! outputs.initialized) {
-        InitializeOutputs(opts, outputs, reader1.file_format());
+        InitializeOutputs(opts, outputs, reader1.file_format(), filename1);
       }
 
       out_data.block_id = block_id;
@@ -429,6 +431,22 @@ void ProcessFiles(const char *filename1, const char *filename2,
     (*outputs.unclassified_output1) << std::flush;
   if (outputs.unclassified_output2 != nullptr)
     (*outputs.unclassified_output2) << std::flush;
+
+  string report_fn;
+  vector<string> fields1 = SplitString(filename1, "_clean_", 3);
+  vector<string> fields2 = SplitString(fields1[0], "/", 3);
+  if (fields2.size() == 1)
+    report_fn = opts.kraken_output_filename + fields1[0] + "_kraken2.kreport";
+  else
+    report_fn = opts.kraken_output_filename + fields2[1] + "_kraken2.kreport";
+  if (opts.mpa_style_report)
+    ReportMpaStyle(report_fn.data(), opts.report_zero_counts, tax,
+        call_counts);
+  else {
+    auto total_unclassified = stats.total_sequences - stats.total_classified;
+    ReportKrakenStyle(report_fn.data(), opts.report_zero_counts, tax,
+        call_counts, stats.total_sequences, total_unclassified);
+  }
 }
 
 taxid_t ResolveTree(taxon_counts_t &hit_counts,
@@ -672,7 +690,7 @@ void AddHitlistString(ostringstream &oss, vector<taxid_t> &taxa,
   }
 }
 
-void InitializeOutputs(Options &opts, OutputStreamData &outputs, SequenceFormat format) {
+void InitializeOutputs(Options &opts, OutputStreamData &outputs, SequenceFormat format, const char* filename) {
   #pragma omp critical(output_init)
   {
     if (! outputs.initialized) {
@@ -715,8 +733,14 @@ void InitializeOutputs(Options &opts, OutputStreamData &outputs, SequenceFormat 
       if (! opts.kraken_output_filename.empty()) {
         if (opts.kraken_output_filename == "-")  // Special filename to silence Kraken output
           outputs.kraken_output = nullptr;
-        else
-          outputs.kraken_output = new ofstream(opts.kraken_output_filename);
+        else {
+          vector<string> fields1 = SplitString(filename, "_clean_", 3);
+          vector<string> fields2 = SplitString(fields1[0], "/", 3);
+          if (fields2.size() == 1)
+            outputs.kraken_output = new ofstream(opts.kraken_output_filename + fields1[0] + "_kraken2.out");
+          else
+            outputs.kraken_output = new ofstream(opts.kraken_output_filename + fields2[1] + "_kraken2.out");
+        }
       }
       outputs.initialized = true;
     }
