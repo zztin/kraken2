@@ -4,7 +4,7 @@ CXXFLAGS += -DLINEAR_PROBING
 
 .PHONY: all clean install
 
-PROGS = estimate_capacity build_db classify dump_table lookup_accession_numbers
+PROGS = estimate_capacity build_db classify dump_table lookup_accession_numbers kraken2-report
 
 all: $(PROGS)
 
@@ -45,3 +45,5 @@ dump_table: dump_table.o mmap_file.o compact_hash.o omp_hack.o taxonomy.o report
 
 lookup_accession_numbers: lookup_accession_numbers.o mmap_file.o omp_hack.o utilities.o
 	$(CXX) $(CXXFLAGS) -o $@ $^
+
+kraken2-report: mmap_file.o reports.o taxonomy.o
