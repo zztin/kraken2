@@ -447,6 +447,9 @@ void ProcessFiles(const char *filename1, const char *filename2,
     ReportKrakenStyle(report_fn.data(), opts.report_zero_counts, tax,
         call_counts, stats.total_sequences, total_unclassified);
   }
+  stats.total_sequences = 0;
+  stats.total_classified = 0;
+  stats.total_bases = 0;
 }
 
 taxid_t ResolveTree(taxon_counts_t &hit_counts,
